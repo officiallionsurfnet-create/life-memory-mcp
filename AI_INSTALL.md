@@ -53,6 +53,10 @@ When and only when the user says that exact phrase:
 
 Never silently dump a chat transcript into the archive. Save only the specific content and context the user approved.
 
+The AI must treat the save interview as a clarification step, not as permission to archive everything discussed. If the user changes their mind, gives an unclear answer, or does not explicitly confirm the final formulation, nothing should be saved.
+
 Publishing is a separate action and still requires explicit consent. Persona simulation is also separate and must not be enabled unless the owner explicitly consents.
+
+The canonical policy is documented in `docs/CONSENT_PROTOCOL.md` and applies to every AI host using Life Memory, regardless of vendor or model.
 
 If the host only supports remote MCP, deploy this repository with `npm run start:http`, HTTPS, and `MEMORY_API_KEY`, then connect the resulting `/mcp` endpoint according to the host's MCP instructions.
