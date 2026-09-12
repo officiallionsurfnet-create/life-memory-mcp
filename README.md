@@ -21,7 +21,8 @@ The repository also contains `AI_INSTALL.md` and `ai-install.json` so another ca
 ## What it can do
 
 - `create_memory_profile` — create a private archive and receive a secret owner token.
-- `save_memory` — save memories/reflections/stories with tags and privacy.
+- `start_memory_save_interview` — opens the mandatory save interview, but only after the exact trigger phrase.
+- `save_memory` — final save step after the interview and explicit user confirmation.
 - `search_memory` — search a profile.
 - `set_memory_sharing` — private / unlisted / public and persona-simulation consent.
 - `export_memory_archive` — produce a portable JSON archive with SHA-256 integrity metadata.
@@ -30,9 +31,29 @@ The repository also contains `AI_INSTALL.md` and `ai-install.json` so another ca
 - `load_memory_persona` — load only consented material for a clearly-labelled AI simulation.
 - `delete_memory` — delete a local entry (published copies elsewhere cannot be guaranteed removable).
 
+## Exact save trigger and interview
+
+Life Memory is deliberately **not** an automatic chat logger. An AI must not save ordinary conversation, inferred preferences, background details, or a whole transcript on its own.
+
+A save workflow may begin only after the user says exactly:
+
+> **Сохрани воспоминания в архив**
+
+No synonym or paraphrase counts. After that phrase, the AI must start `start_memory_save_interview` and ask:
+
+1. What exactly should be saved?
+2. In what context should it be understood?
+3. Keep the exact words, a summary, or both?
+4. Should the entry be private or public?
+5. After showing the final formulation: does the user explicitly confirm it?
+
+Only after the final confirmation can `save_memory` succeed. The plugin enforces this with a short-lived interview session ID, so a host AI cannot directly call `save_memory` without first passing the exact trigger gate.
+
+This means the archive behaves more like a deliberate personal notebook than a hidden transcript recorder.
+
 ## Privacy by design
 
-New profiles and new memories are private by default. Publishing requires an explicit action. Persona simulation is a **separate consent flag** and defaults to false. The owner token is shown once and stored only as a SHA-256 hash.
+New profiles and new memories are private by default. Saving itself requires the exact trigger phrase, a mandatory interview, and explicit final confirmation. Publishing requires an explicit action. Persona simulation is a **separate consent flag** and defaults to false. The owner token is shown once and stored only as a SHA-256 hash.
 
 Do not put passwords, financial secrets, private medical records, government identifiers, or other highly sensitive information into a public archive.
 
