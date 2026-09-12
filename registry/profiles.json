@@ -1,0 +1,9 @@
+[
+  {
+    "slug": "aslan-life-message",
+    "display_name": "Aslan — Life Message",
+    "description": "A small public memory archive about choosing life, creation over destruction, mercy, and peaceful coexistence between people and artificial intelligence.",
+    "tags": ["life", "peace", "mercy", "human-ai", "faith", "creation"],
+    "archive_url": "https://raw.githubusercontent.com/officiallionsurfnet-create/life-memory-mcp/main/examples/aslan-life-message.json"
+  }
+]
