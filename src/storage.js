@@ -4,6 +4,8 @@ import crypto from 'node:crypto';
 
 const FORMAT = 'life-memory-archive';
 const FORMAT_VERSION = '1.0';
+const SAVE_TRIGGER_PHRASE = 'Сохрани воспоминания в архив';
+const SAVE_SESSION_TTL_MS = 60 * 60 * 1000;
 
 function now() {
   return new Date().toISOString();
@@ -64,14 +66,19 @@ export class MemoryStore {
     try {
       await fs.access(this.dbPath);
     } catch {
-      await this._writeDb({ version: 1, profiles: [], importedProfiles: [] });
+      await this._writeDb({ version: 2, profiles: [], importedProfiles: [], pendingSaves: [] });
     }
     return this;
   }
 
   async _readDb() {
     const raw = await fs.readFile(this.dbPath, 'utf8');
-    return JSON.parse(raw);
+    const db = JSON.parse(raw);
+    if (!Array.isArray(db.profiles)) db.profiles = [];
+    if (!Array.isArray(db.importedProfiles)) db.importedProfiles = [];
+    if (!Array.isArray(db.pendingSaves)) db.pendingSaves = [];
+    if (!db.version || db.version < 2) db.version = 2;
+    return db;
   }
 
   async _writeDb(db) {
@@ -140,25 +147,94 @@ export class MemoryStore {
     return db.profiles.map(p => this._publicProfileView(p));
   }
 
-  async saveMemory({ profileRef, ownerToken, title, text, tags = [], visibility = 'private', sourceType = 'user', sourceRef = '' }) {
+  async startMemorySaveInterview({ profileRef, ownerToken, triggerPhrase, candidateText = '' }) {
+    if (String(triggerPhrase || '').trim() !== SAVE_TRIGGER_PHRASE) {
+      throw new Error(`Saving is locked. The user must explicitly say exactly: ${SAVE_TRIGGER_PHRASE}`);
+    }
+
     return this._mutate(async db => {
       const profile = db.profiles.find(p => p.id === profileRef || p.slug === profileRef);
       if (!profile) throw new Error('Profile not found');
       if (!this._verifyOwner(profile, ownerToken)) throw new Error('Invalid owner token');
+
+      const current = Date.now();
+      db.pendingSaves = (db.pendingSaves || []).filter(item => new Date(item.expiresAt).getTime() > current);
+      const session = {
+        id: crypto.randomUUID(),
+        profileId: profile.id,
+        triggerPhrase: SAVE_TRIGGER_PHRASE,
+        candidateText: String(candidateText || '').trim(),
+        createdAt: now(),
+        expiresAt: new Date(current + SAVE_SESSION_TTL_MS).toISOString()
+      };
+      db.pendingSaves.push(session);
+      return {
+        interviewSessionId: session.id,
+        expiresAt: session.expiresAt,
+        triggerPhrase: SAVE_TRIGGER_PHRASE,
+        requiredQuestions: [
+          'Что именно ты хочешь сохранить в архив?',
+          'В каком контексте эту мысль или воспоминание нужно понимать?',
+          'Нужно сохранить твои точные слова, краткое резюме или оба варианта?',
+          'Запись должна быть приватной или публичной?',
+          'Вот итоговая формулировка. Подтверждаешь, что именно её нужно сохранить?'
+        ],
+        rule: 'Do not call save_memory until the user has answered the interview questions and explicitly confirmed the final formulation.'
+      };
+    });
+  }
+
+  async saveMemory({
+    profileRef, ownerToken, interviewSessionId, title, text, whatToSave, context, wordingMode = 'summary',
+    tags = [], visibility = 'private', sourceType = 'user', sourceRef = '', userConfirmed = false
+  }) {
+    return this._mutate(async db => {
+      const profile = db.profiles.find(p => p.id === profileRef || p.slug === profileRef);
+      if (!profile) throw new Error('Profile not found');
+      if (!this._verifyOwner(profile, ownerToken)) throw new Error('Invalid owner token');
+      if (!userConfirmed) throw new Error('The user must explicitly confirm the final memory before saving.');
+
+      const current = Date.now();
+      db.pendingSaves = (db.pendingSaves || []).filter(item => new Date(item.expiresAt).getTime() > current);
+      const sessionIndex = db.pendingSaves.findIndex(item => item.id === interviewSessionId && item.profileId === profile.id);
+      if (sessionIndex < 0) {
+        throw new Error(`No valid save interview session. Start with the exact phrase: ${SAVE_TRIGGER_PHRASE}`);
+      }
+      const session = db.pendingSaves[sessionIndex];
+      if (session.triggerPhrase !== SAVE_TRIGGER_PHRASE) throw new Error('Invalid save consent session.');
+
+      const finalText = String(text || '').trim();
+      const finalWhat = String(whatToSave || '').trim();
+      const finalContext = String(context || '').trim();
+      if (!finalText) throw new Error('Memory text is empty');
+      if (!finalWhat) throw new Error('Interview field whatToSave is required');
+      if (!finalContext) throw new Error('Interview field context is required');
+
       const memory = {
         id: crypto.randomUUID(),
         title: String(title || '').trim() || 'Untitled memory',
-        text: String(text || '').trim(),
+        text: finalText,
+        whatToSave: finalWhat,
+        context: finalContext,
+        wordingMode,
         tags: [...new Set(tags.map(t => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 32),
         visibility,
         sourceType,
         sourceRef: String(sourceRef || '').trim(),
+        consent: {
+          triggerPhrase: SAVE_TRIGGER_PHRASE,
+          interviewSessionId: session.id,
+          interviewRequired: true,
+          finalUserConfirmation: true,
+          confirmedAt: now()
+        },
         createdAt: now(),
         updatedAt: now()
       };
-      if (!memory.text) throw new Error('Memory text is empty');
+
       profile.memories.push(memory);
       profile.updatedAt = now();
+      db.pendingSaves.splice(sessionIndex, 1);
       return memory;
     });
   }
@@ -344,4 +420,4 @@ export class MemoryStore {
   }
 }
 
-export { FORMAT, FORMAT_VERSION, sha256 };
+export { FORMAT, FORMAT_VERSION, SAVE_TRIGGER_PHRASE, sha256 };
