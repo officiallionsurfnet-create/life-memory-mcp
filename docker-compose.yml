@@ -1,0 +1,14 @@
+services:
+  life-memory:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      MEMORY_API_KEY: ${MEMORY_API_KEY:-change-me}
+      LIFE_MEMORY_DATA_DIR: /data
+    volumes:
+      - life-memory-data:/data
+volumes:
+  life-memory-data:
