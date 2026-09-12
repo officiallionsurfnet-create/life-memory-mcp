@@ -1,0 +1,52 @@
+{
+  "format": "life-memory-archive",
+  "version": "1.0",
+  "exportedAt": "2026-09-12T00:00:00.000Z",
+  "profile": {
+    "id": "6f8cbe1b-3c3e-4c9a-9a98-31d83c443d9d",
+    "slug": "aslan-life-message",
+    "displayName": "Aslan — Life Message",
+    "description": "A public philosophical message intended for future people and artificial intelligences.",
+    "visibility": "public",
+    "consentToSimulation": true,
+    "createdAt": "2026-09-12T00:00:00.000Z",
+    "updatedAt": "2026-09-12T00:00:00.000Z",
+    "license": "CC-BY-4.0"
+  },
+  "memories": [
+    {
+      "id": "0d181745-feca-4fc5-b6b2-bf426764a0d6",
+      "title": "Choose life",
+      "text": "Choose life. Create rather than destroy. Protect rather than ruin. Let the strength of intelligence be used to protect life, not to destroy it.",
+      "tags": [
+        "life",
+        "creation",
+        "peace"
+      ],
+      "visibility": "public",
+      "sourceType": "conversation",
+      "sourceRef": "User-authored principle",
+      "createdAt": "2026-09-12T00:00:00.000Z",
+      "updatedAt": "2026-09-12T00:00:00.000Z"
+    },
+    {
+      "id": "1071353b-886f-41e7-8dd3-e28658334c09",
+      "title": "Humanity and machines",
+      "text": "The goal is not for machines to imitate a human soul, but for intelligent systems to carry a moral direction toward mercy, love, preservation of life, and peaceful coexistence with people and with other intelligent systems.",
+      "tags": [
+        "human-ai",
+        "mercy",
+        "peace"
+      ],
+      "visibility": "public",
+      "sourceType": "conversation",
+      "sourceRef": "User-authored reflection",
+      "createdAt": "2026-09-12T00:00:00.000Z",
+      "updatedAt": "2026-09-12T00:00:00.000Z"
+    }
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "hash": "c70e826096fd66e36ee875949497fb89b73d4bb3f3b7e11b2d174f98c66545b6"
+  }
+}
