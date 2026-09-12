@@ -1,0 +1,40 @@
+{
+  "name": "life-memory-mcp",
+  "version": "0.1.0",
+  "description": "Portable MCP memory archive: save, share, discover, import, and talk with memory-based personas with explicit consent.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/officiallionsurfnet-create/life-memory-mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/officiallionsurfnet-create/life-memory-mcp.git"
+  },
+  "bin": {
+    "life-memory-mcp": "src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "start:http": "node src/http.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/express": "2.0.0",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "express": "^5.1.0",
+    "zod": "^4.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "memory",
+    "ai-memory",
+    "digital-legacy",
+    "persona",
+    "chatgpt",
+    "claude",
+    "codex"
+  ]
+}
