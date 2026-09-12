@@ -13,7 +13,10 @@
   "install": {
     "stdio": {
       "command": "npx",
-      "args": ["-y", "github:officiallionsurfnet-create/life-memory-mcp"]
+      "args": [
+        "-y",
+        "github:officiallionsurfnet-create/life-memory-mcp"
+      ]
     },
     "http": {
       "start_command": "npm run start:http",
@@ -33,8 +36,12 @@
       "exact words vs summary vs both",
       "private vs public"
     ],
+    "show_final_formulation_before_save": true,
     "final_user_confirmation_required": true,
-    "whole_chat_dump_forbidden": true
+    "cancel_or_ambiguity_means_do_not_save": true,
+    "whole_chat_dump_forbidden": true,
+    "ordinary_conversation_is_not_save_consent": true,
+    "policy_document": "docs/CONSENT_PROTOCOL.md"
   },
   "safety": {
     "default_private": true,
