@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import { MemoryStore } from './storage.js';
+import { MemoryStore, SAVE_TRIGGER_PHRASE } from './storage.js';
 
 function textResult(value) {
   return { content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }] };
@@ -15,14 +15,17 @@ export async function createLifeMemoryServer(options = {}) {
   const server = new McpServer(
     {
       name: 'life-memory-mcp',
-      version: '0.1.0',
+      version: '0.2.0',
       websiteUrl: 'https://github.com/officiallionsurfnet-create/life-memory-mcp'
     },
     {
       capabilities: { tools: {} },
       instructions: [
         'Life Memory stores user-controlled memory archives.',
-        'Never save private information unless the user explicitly asks to save it.',
+        `ABSOLUTE SAVE RULE: never save anything unless the user explicitly says exactly: "${SAVE_TRIGGER_PHRASE}". Do not treat synonyms, paraphrases, inferred intent, or prior consent as permission to save.`,
+        'After the trigger phrase, do not save immediately. Start a memory-save interview and ask what exactly should be saved, the context, whether exact wording or a summary should be kept, and whether it should be private or public.',
+        'Show the final proposed memory to the user and obtain explicit confirmation before calling save_memory.',
+        'Do not silently archive whole chats. Only save the specific user-approved memory/reflection and its user-approved context.',
         'Never publish a profile or memory without explicit user consent.',
         'Memory-based persona mode is a simulation, not the real person or their consciousness.',
         'When the user asks to talk with an archived person, call load_memory_persona and clearly preserve that distinction.'
@@ -62,29 +65,58 @@ export async function createLifeMemoryServer(options = {}) {
     try { return textResult(await store.listProfiles()); } catch (e) { return errorResult(e); }
   });
 
-  server.registerTool('save_memory', {
-    description: 'Save a memory, reflection, value, story, or message into a profile. Requires owner token.',
+  server.registerTool('start_memory_save_interview', {
+    description: `Start the mandatory consent interview for saving a memory. This tool only succeeds if the user explicitly said exactly: "${SAVE_TRIGGER_PHRASE}". Starting an interview does NOT save a memory.`,
     inputSchema: z.object({
       profile: z.string().min(1),
       owner_token: z.string().min(16),
+      trigger_phrase: z.string().min(1),
+      candidate_text: z.string().max(200000).optional()
+    })
+  }, async args => {
+    try {
+      return textResult(await store.startMemorySaveInterview({
+        profileRef: args.profile,
+        ownerToken: args.owner_token,
+        triggerPhrase: args.trigger_phrase,
+        candidateText: args.candidate_text
+      }));
+    } catch (e) { return errorResult(e); }
+  });
+
+  server.registerTool('save_memory', {
+    description: `FINAL save step after start_memory_save_interview. Never call directly. Requires a valid interview session created only by the exact phrase "${SAVE_TRIGGER_PHRASE}", required context fields, and explicit final user confirmation.`,
+    inputSchema: z.object({
+      profile: z.string().min(1),
+      owner_token: z.string().min(16),
+      interview_session_id: z.string().uuid(),
       title: z.string().max(200).optional(),
       text: z.string().min(1).max(200000),
+      what_to_save: z.string().min(1).max(4000),
+      context: z.string().min(1).max(10000),
+      wording_mode: z.enum(['exact_words', 'summary', 'both']).default('summary'),
       tags: z.array(z.string().max(60)).max(32).default([]),
       visibility: z.enum(['private', 'public']).default('private'),
       source_type: z.enum(['user', 'conversation', 'document', 'audio-transcript', 'other']).default('user'),
-      source_ref: z.string().max(1000).optional()
+      source_ref: z.string().max(1000).optional(),
+      user_confirmed: z.literal(true)
     })
   }, async args => {
     try {
       return textResult(await store.saveMemory({
         profileRef: args.profile,
         ownerToken: args.owner_token,
+        interviewSessionId: args.interview_session_id,
         title: args.title,
         text: args.text,
+        whatToSave: args.what_to_save,
+        context: args.context,
+        wordingMode: args.wording_mode,
         tags: args.tags,
         visibility: args.visibility,
         sourceType: args.source_type,
-        sourceRef: args.source_ref
+        sourceRef: args.source_ref,
+        userConfirmed: args.user_confirmed
       }));
     } catch (e) { return errorResult(e); }
   });
@@ -188,13 +220,22 @@ export async function createLifeMemoryServer(options = {}) {
   });
 
   server.registerTool('life_memory_install_info', {
-    description: 'Return canonical installation and safety information for Life Memory MCP.',
+    description: 'Return canonical installation, save-consent, and safety information for Life Memory MCP.',
     inputSchema: z.object({})
   }, async () => textResult({
     name: 'Life Memory MCP',
+    version: '0.2.0',
     repository: 'https://github.com/officiallionsurfnet-create/life-memory-mcp',
     stdio_install: 'npx -y github:officiallionsurfnet-create/life-memory-mcp',
-    principle: 'User-owned memory. Explicit consent for publishing and persona simulation. A simulation is never the real person.'
+    save_trigger_phrase: SAVE_TRIGGER_PHRASE,
+    save_policy: [
+      'Never save from ordinary conversation.',
+      `Only start saving after the exact phrase: ${SAVE_TRIGGER_PHRASE}`,
+      'Always interview the user about exactly what to save and the context.',
+      'Show the final formulation and get explicit confirmation.',
+      'Then and only then call save_memory.'
+    ],
+    principle: 'User-owned memory. Explicit consent for saving, publishing, and persona simulation. A simulation is never the real person.'
   }));
 
   return server;
