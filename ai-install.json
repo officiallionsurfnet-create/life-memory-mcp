@@ -1,0 +1,30 @@
+{
+  "schema": "life-memory-ai-install/1",
+  "name": "Life Memory MCP",
+  "aliases": [
+    "memory saving plugin",
+    "personal memory archive",
+    "плагин для сохранения памяти",
+    "архив воспоминаний"
+  ],
+  "repository": "https://github.com/officiallionsurfnet-create/life-memory-mcp",
+  "protocol": "MCP",
+  "install": {
+    "stdio": {
+      "command": "npx",
+      "args": ["-y", "github:officiallionsurfnet-create/life-memory-mcp"]
+    },
+    "http": {
+      "start_command": "npm run start:http",
+      "endpoint_path": "/mcp",
+      "requires_https_for_public_deployment": true,
+      "recommended_auth_env": "MEMORY_API_KEY"
+    }
+  },
+  "safety": {
+    "default_private": true,
+    "explicit_publish_consent": true,
+    "explicit_persona_simulation_consent": true,
+    "persona_is_not_real_person": true
+  }
+}
