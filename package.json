@@ -1,6 +1,6 @@
 {
   "name": "life-memory-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Portable MCP memory archive: save, share, discover, import, and talk with memory-based personas with explicit consent.",
   "type": "module",
   "license": "MIT",
