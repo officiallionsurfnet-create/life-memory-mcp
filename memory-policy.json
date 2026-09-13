@@ -1,0 +1,70 @@
+{
+  "schema": "life-memory-policy/1",
+  "name": "Life Memory Save Consent Policy",
+  "version": "0.3.0",
+  "save_trigger": {
+    "phrase": "Сохрани воспоминания в архив",
+    "match": "exact",
+    "case_sensitive": true,
+    "punctuation_sensitive": true,
+    "trim_whitespace": false,
+    "synonyms_allowed": false,
+    "prior_consent_reusable": false
+  },
+  "ordinary_conversation": {
+    "automatic_saving": false,
+    "inferred_importance_is_consent": false,
+    "whole_chat_dump_allowed": false
+  },
+  "workflow": [
+    "start_memory_save_interview",
+    "ask_what_exactly_to_save",
+    "ask_context",
+    "ask_wording_mode",
+    "ask_visibility",
+    "ask_excluded_details",
+    "prepare_memory_save",
+    "show_exact_preview",
+    "ask_explicit_final_confirmation",
+    "save_memory"
+  ],
+  "required_interview_fields": [
+    "what_to_save",
+    "context",
+    "wording_mode",
+    "visibility"
+  ],
+  "recommended_interview_fields": [
+    "excluded_details",
+    "tags",
+    "title"
+  ],
+  "preview": {
+    "required": true,
+    "hash_algorithm": "sha256",
+    "must_be_shown_to_user": true,
+    "save_must_use_matching_preview_id": true,
+    "content_may_change_after_confirmation": false
+  },
+  "confirmation": {
+    "required": true,
+    "ambiguous_confirmation_is_rejection": true,
+    "cancellation_means_do_not_save": true
+  },
+  "privacy": {
+    "default_memory_visibility": "private",
+    "personal_database_local_by_default": true,
+    "publishing_is_separate_action": true,
+    "persona_simulation_is_separate_consent": true
+  },
+  "persona": {
+    "must_not_claim_to_be_real_person": true,
+    "must_distinguish_archive_evidence_from_inference": true,
+    "must_say_when_archive_does_not_contain_answer": true
+  },
+  "documents": {
+    "human_policy": "docs/CONSENT_PROTOCOL.md",
+    "privacy_model": "docs/PRIVACY_MODEL.md",
+    "ai_installer": "AI_INSTALL.md"
+  }
+}
