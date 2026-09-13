@@ -50,6 +50,10 @@ function scoreText(query, text) {
   return score;
 }
 
+function normalizeTags(tags = []) {
+  return [...new Set(tags.map(t => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 32);
+}
+
 export class MemoryStore {
   constructor({ dataDir, registryUrl } = {}) {
     this.dataDir = path.resolve(dataDir || process.env.LIFE_MEMORY_DATA_DIR || '.life-memory');
@@ -66,7 +70,7 @@ export class MemoryStore {
     try {
       await fs.access(this.dbPath);
     } catch {
-      await this._writeDb({ version: 2, profiles: [], importedProfiles: [], pendingSaves: [] });
+      await this._writeDb({ version: 3, profiles: [], importedProfiles: [], pendingSaves: [] });
     }
     return this;
   }
@@ -77,7 +81,7 @@ export class MemoryStore {
     if (!Array.isArray(db.profiles)) db.profiles = [];
     if (!Array.isArray(db.importedProfiles)) db.importedProfiles = [];
     if (!Array.isArray(db.pendingSaves)) db.pendingSaves = [];
-    if (!db.version || db.version < 2) db.version = 2;
+    if (!db.version || db.version < 3) db.version = 3;
     return db;
   }
 
@@ -103,6 +107,18 @@ export class MemoryStore {
     const a = Buffer.from(profile.ownerTokenHash || '', 'hex');
     const b = Buffer.from(presented, 'hex');
     return a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b);
+  }
+
+  _prunePendingSaves(db) {
+    const current = Date.now();
+    db.pendingSaves = (db.pendingSaves || []).filter(item => new Date(item.expiresAt).getTime() > current);
+  }
+
+  _findOwnedProfile(db, profileRef, ownerToken) {
+    const profile = db.profiles.find(p => p.id === profileRef || p.slug === profileRef);
+    if (!profile) throw new Error('Profile not found');
+    if (!this._verifyOwner(profile, ownerToken)) throw new Error('Invalid owner token');
+    return profile;
   }
 
   async createProfile({ displayName, slug, description = '', visibility = 'private', consentToSimulation = false }) {
@@ -148,22 +164,23 @@ export class MemoryStore {
   }
 
   async startMemorySaveInterview({ profileRef, ownerToken, triggerPhrase, candidateText = '' }) {
-    if (String(triggerPhrase || '').trim() !== SAVE_TRIGGER_PHRASE) {
+    if (String(triggerPhrase || '') !== SAVE_TRIGGER_PHRASE) {
       throw new Error(`Saving is locked. The user must explicitly say exactly: ${SAVE_TRIGGER_PHRASE}`);
     }
 
     return this._mutate(async db => {
-      const profile = db.profiles.find(p => p.id === profileRef || p.slug === profileRef);
-      if (!profile) throw new Error('Profile not found');
-      if (!this._verifyOwner(profile, ownerToken)) throw new Error('Invalid owner token');
+      const profile = this._findOwnedProfile(db, profileRef, ownerToken);
+      this._prunePendingSaves(db);
 
       const current = Date.now();
-      db.pendingSaves = (db.pendingSaves || []).filter(item => new Date(item.expiresAt).getTime() > current);
       const session = {
         id: crypto.randomUUID(),
         profileId: profile.id,
         triggerPhrase: SAVE_TRIGGER_PHRASE,
         candidateText: String(candidateText || '').trim(),
+        status: 'interview',
+        prepared: null,
+        previewHash: null,
         createdAt: now(),
         expiresAt: new Date(current + SAVE_SESSION_TTL_MS).toISOString()
       };
@@ -177,31 +194,26 @@ export class MemoryStore {
           'В каком контексте эту мысль или воспоминание нужно понимать?',
           'Нужно сохранить твои точные слова, краткое резюме или оба варианта?',
           'Запись должна быть приватной или публичной?',
-          'Вот итоговая формулировка. Подтверждаешь, что именно её нужно сохранить?'
+          'Есть ли детали, которые нельзя включать в архив?',
+          'Покажи итоговую формулировку и спроси, подтверждает ли пользователь сохранение именно этой версии.'
         ],
-        rule: 'Do not call save_memory until the user has answered the interview questions and explicitly confirmed the final formulation.'
+        nextStep: 'Collect the answers, then call prepare_memory_save. Do not call save_memory yet.'
       };
     });
   }
 
-  async saveMemory({
+  async prepareMemorySave({
     profileRef, ownerToken, interviewSessionId, title, text, whatToSave, context, wordingMode = 'summary',
-    tags = [], visibility = 'private', sourceType = 'user', sourceRef = '', userConfirmed = false
+    tags = [], visibility = 'private', sourceType = 'user', sourceRef = '', excludedDetails = ''
   }) {
     return this._mutate(async db => {
-      const profile = db.profiles.find(p => p.id === profileRef || p.slug === profileRef);
-      if (!profile) throw new Error('Profile not found');
-      if (!this._verifyOwner(profile, ownerToken)) throw new Error('Invalid owner token');
-      if (!userConfirmed) throw new Error('The user must explicitly confirm the final memory before saving.');
+      const profile = this._findOwnedProfile(db, profileRef, ownerToken);
+      this._prunePendingSaves(db);
 
-      const current = Date.now();
-      db.pendingSaves = (db.pendingSaves || []).filter(item => new Date(item.expiresAt).getTime() > current);
-      const sessionIndex = db.pendingSaves.findIndex(item => item.id === interviewSessionId && item.profileId === profile.id);
-      if (sessionIndex < 0) {
+      const session = db.pendingSaves.find(item => item.id === interviewSessionId && item.profileId === profile.id);
+      if (!session || session.triggerPhrase !== SAVE_TRIGGER_PHRASE) {
         throw new Error(`No valid save interview session. Start with the exact phrase: ${SAVE_TRIGGER_PHRASE}`);
       }
-      const session = db.pendingSaves[sessionIndex];
-      if (session.triggerPhrase !== SAVE_TRIGGER_PHRASE) throw new Error('Invalid save consent session.');
 
       const finalText = String(text || '').trim();
       const finalWhat = String(whatToSave || '').trim();
@@ -210,21 +222,89 @@ export class MemoryStore {
       if (!finalWhat) throw new Error('Interview field whatToSave is required');
       if (!finalContext) throw new Error('Interview field context is required');
 
-      const memory = {
-        id: crypto.randomUUID(),
+      const prepared = {
         title: String(title || '').trim() || 'Untitled memory',
         text: finalText,
         whatToSave: finalWhat,
         context: finalContext,
         wordingMode,
-        tags: [...new Set(tags.map(t => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 32),
+        tags: normalizeTags(tags),
         visibility,
         sourceType,
         sourceRef: String(sourceRef || '').trim(),
+        excludedDetails: String(excludedDetails || '').trim()
+      };
+      const previewHash = sha256(JSON.stringify(prepared));
+      session.status = 'prepared';
+      session.prepared = prepared;
+      session.previewHash = previewHash;
+      session.preparedAt = now();
+
+      return {
+        interviewSessionId: session.id,
+        previewId: previewHash,
+        preview: prepared,
+        confirmationQuestion: 'Подтверждаешь, что именно эту итоговую версию нужно сохранить в архив?',
+        rule: 'Do not call save_memory unless the user explicitly confirms this exact preview.'
+      };
+    });
+  }
+
+  async getMemorySaveStatus({ profileRef, ownerToken, interviewSessionId }) {
+    const db = await this._readDb();
+    const profile = this._findOwnedProfile(db, profileRef, ownerToken);
+    this._prunePendingSaves(db);
+    const session = db.pendingSaves.find(item => item.id === interviewSessionId && item.profileId === profile.id);
+    if (!session) return { active: false };
+    return {
+      active: true,
+      interviewSessionId: session.id,
+      status: session.status,
+      expiresAt: session.expiresAt,
+      previewId: session.previewHash || null,
+      preview: session.prepared || null
+    };
+  }
+
+  async cancelMemorySave({ profileRef, ownerToken, interviewSessionId }) {
+    return this._mutate(async db => {
+      const profile = this._findOwnedProfile(db, profileRef, ownerToken);
+      this._prunePendingSaves(db);
+      const before = db.pendingSaves.length;
+      db.pendingSaves = db.pendingSaves.filter(item => !(item.id === interviewSessionId && item.profileId === profile.id));
+      return { cancelled: db.pendingSaves.length < before, interviewSessionId };
+    });
+  }
+
+  async saveMemory({ profileRef, ownerToken, interviewSessionId, previewId, userConfirmed = false }) {
+    return this._mutate(async db => {
+      const profile = this._findOwnedProfile(db, profileRef, ownerToken);
+      if (!userConfirmed) throw new Error('The user must explicitly confirm the exact preview before saving.');
+      this._prunePendingSaves(db);
+
+      const sessionIndex = db.pendingSaves.findIndex(item => item.id === interviewSessionId && item.profileId === profile.id);
+      if (sessionIndex < 0) {
+        throw new Error(`No valid save interview session. Start with the exact phrase: ${SAVE_TRIGGER_PHRASE}`);
+      }
+      const session = db.pendingSaves[sessionIndex];
+      if (session.triggerPhrase !== SAVE_TRIGGER_PHRASE) throw new Error('Invalid save consent session.');
+      if (session.status !== 'prepared' || !session.prepared || !session.previewHash) {
+        throw new Error('The memory must be prepared and previewed before it can be saved.');
+      }
+      if (String(previewId || '') !== session.previewHash) {
+        throw new Error('Preview mismatch. The confirmed memory must exactly match the prepared preview.');
+      }
+
+      const prepared = structuredClone(session.prepared);
+      const memory = {
+        id: crypto.randomUUID(),
+        ...prepared,
         consent: {
           triggerPhrase: SAVE_TRIGGER_PHRASE,
           interviewSessionId: session.id,
           interviewRequired: true,
+          previewRequired: true,
+          previewHash: session.previewHash,
           finalUserConfirmation: true,
           confirmedAt: now()
         },
@@ -241,9 +321,7 @@ export class MemoryStore {
 
   async deleteMemory({ profileRef, ownerToken, memoryId }) {
     return this._mutate(async db => {
-      const profile = db.profiles.find(p => p.id === profileRef || p.slug === profileRef);
-      if (!profile) throw new Error('Profile not found');
-      if (!this._verifyOwner(profile, ownerToken)) throw new Error('Invalid owner token');
+      const profile = this._findOwnedProfile(db, profileRef, ownerToken);
       const before = profile.memories.length;
       profile.memories = profile.memories.filter(m => m.id !== memoryId);
       profile.updatedAt = now();
@@ -253,9 +331,7 @@ export class MemoryStore {
 
   async setProfileSharing({ profileRef, ownerToken, visibility, consentToSimulation }) {
     return this._mutate(async db => {
-      const profile = db.profiles.find(p => p.id === profileRef || p.slug === profileRef);
-      if (!profile) throw new Error('Profile not found');
-      if (!this._verifyOwner(profile, ownerToken)) throw new Error('Invalid owner token');
+      const profile = this._findOwnedProfile(db, profileRef, ownerToken);
       profile.visibility = visibility;
       if (typeof consentToSimulation === 'boolean') profile.consentToSimulation = consentToSimulation;
       profile.updatedAt = now();
@@ -340,7 +416,7 @@ export class MemoryStore {
   }
 
   async importArchiveFromUrl(url) {
-    const response = await fetch(url, { headers: { 'user-agent': 'life-memory-mcp/0.1' }, signal: AbortSignal.timeout(10000) });
+    const response = await fetch(url, { headers: { 'user-agent': 'life-memory-mcp/0.3' }, signal: AbortSignal.timeout(10000) });
     if (!response.ok) throw new Error(`Failed to fetch archive: HTTP ${response.status}`);
     const archive = await response.json();
     return this.importArchiveObject(archive, { sourceUrl: url });
@@ -358,7 +434,7 @@ export class MemoryStore {
   async discoverPublic(query = '') {
     const combined = [...await this._loadBundledRegistry()];
     try {
-      const response = await fetch(this.registryUrl, { headers: { 'user-agent': 'life-memory-mcp/0.1' }, signal: AbortSignal.timeout(7000) });
+      const response = await fetch(this.registryUrl, { headers: { 'user-agent': 'life-memory-mcp/0.3' }, signal: AbortSignal.timeout(7000) });
       if (response.ok) {
         const remote = await response.json();
         if (Array.isArray(remote)) combined.push(...remote);
