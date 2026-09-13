@@ -1,7 +1,7 @@
 {
-  "schema": "life-memory-ai-install/2",
+  "schema": "life-memory-ai-install/3",
   "name": "Life Memory MCP",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "aliases": [
     "memory saving plugin",
     "personal memory archive",
@@ -29,19 +29,33 @@
     "automatic_saving": false,
     "exact_trigger_phrase": "Сохрани воспоминания в архив",
     "accept_synonyms": false,
+    "accept_case_variants": false,
+    "accept_punctuation_variants": false,
+    "ordinary_conversation_is_not_save_consent": true,
+    "whole_chat_dump_forbidden": true,
     "interview_required": true,
     "required_interview_topics": [
       "what exactly to save",
       "context",
       "exact words vs summary vs both",
-      "private vs public"
+      "private vs public",
+      "details that must be excluded"
     ],
-    "show_final_formulation_before_save": true,
+    "prepare_preview_required": true,
+    "show_exact_preview_before_save": true,
+    "preview_hash_must_match_on_save": true,
     "final_user_confirmation_required": true,
     "cancel_or_ambiguity_means_do_not_save": true,
-    "whole_chat_dump_forbidden": true,
-    "ordinary_conversation_is_not_save_consent": true,
-    "policy_document": "docs/CONSENT_PROTOCOL.md"
+    "pending_session_expires": true,
+    "policy_document": "docs/CONSENT_PROTOCOL.md",
+    "machine_policy": "memory-policy.json"
+  },
+  "privacy": {
+    "personal_memory_local_by_default": true,
+    "public_repository_contains_plugin_code_not_private_memories": true,
+    "publishing_is_separate_from_saving": true,
+    "private_memory_should_not_be_committed_to_public_git": true,
+    "privacy_document": "docs/PRIVACY_MODEL.md"
   },
   "safety": {
     "default_private": true,
