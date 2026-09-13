@@ -1,0 +1,46 @@
+{
+  "format": "life-memory-archive",
+  "version": "1.0",
+  "exportedAt": "2026-09-13T00:00:00.000Z",
+  "profile": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "slug": "example-person",
+    "displayName": "Example Person",
+    "description": "Synthetic example demonstrating the Life Memory 0.3 consent fields.",
+    "visibility": "public",
+    "consentToSimulation": false,
+    "createdAt": "2026-09-13T00:00:00.000Z",
+    "updatedAt": "2026-09-13T00:00:00.000Z",
+    "license": "CC-BY-4.0"
+  },
+  "memories": [
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "title": "Why old photographs matter",
+      "text": "Old family photographs matter to me because they connect family history across generations.",
+      "whatToSave": "A reflection about the personal meaning of old family photographs.",
+      "context": "This is about family memory and continuity, not merely a preference for vintage images.",
+      "wordingMode": "summary",
+      "tags": ["family", "memory", "photographs"],
+      "visibility": "public",
+      "sourceType": "user",
+      "sourceRef": "synthetic-example",
+      "excludedDetails": "Names of relatives were intentionally excluded.",
+      "consent": {
+        "triggerPhrase": "Сохрани воспоминания в архив",
+        "interviewSessionId": "33333333-3333-4333-8333-333333333333",
+        "interviewRequired": true,
+        "previewRequired": true,
+        "previewHash": "71ac3d481ba99570877b042305a270688c01dc853f1468b5501af01589b56d95",
+        "finalUserConfirmation": true,
+        "confirmedAt": "2026-09-13T00:00:00.000Z"
+      },
+      "createdAt": "2026-09-13T00:00:00.000Z",
+      "updatedAt": "2026-09-13T00:00:00.000Z"
+    }
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "hash": "4eaeb366d7e163326053f5df82e43c41f8fe91677874f79f1db97614d96873a8"
+  }
+}
