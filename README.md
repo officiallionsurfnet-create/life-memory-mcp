@@ -1,6 +1,6 @@
 # Life Memory MCP
 
-**Portable, user-owned memory for AI.** Save memories, reflections, values and stories; export them in an open JSON format; publish only what you explicitly choose; discover public archives; and load a consented archive as context for a clearly-labelled memory-based AI persona.
+**Portable, user-owned memory for AI.** Save memories, reflections, values and stories deliberately; export them in an open JSON format; publish only what you explicitly choose; discover public archives; and load a consented archive as context for a clearly-labelled memory-based AI persona.
 
 > A memory-based persona is **not** the real person, their consciousness, soul, or a guaranteed reconstruction. It is an AI simulation constrained by the archived material.
 
@@ -16,13 +16,16 @@ If the AI can run shell commands, the canonical stdio command is:
 npx -y github:officiallionsurfnet-create/life-memory-mcp
 ```
 
-The repository also contains `AI_INSTALL.md` and `ai-install.json` so another capable AI can discover the exact setup without guessing.
+The repository contains `AI_INSTALL.md`, `ai-install.json`, and `memory-policy.json` so another capable AI can discover the exact setup and consent rules without guessing.
 
 ## What it can do
 
 - `create_memory_profile` — create a private archive and receive a secret owner token.
-- `start_memory_save_interview` — opens the mandatory save interview, but only after the exact trigger phrase.
-- `save_memory` — final save step after the interview and explicit user confirmation.
+- `start_memory_save_interview` — open the mandatory save interview, but only after the exact trigger phrase.
+- `prepare_memory_save` — create the exact preview that the user is considering saving; nothing is saved yet.
+- `get_memory_save_status` — inspect an active interview/preview session.
+- `cancel_memory_save` — cancel a pending save so nothing is written.
+- `save_memory` — final commit only after explicit confirmation of the exact preview.
 - `search_memory` — search a profile.
 - `set_memory_sharing` — private / unlisted / public and persona-simulation consent.
 - `export_memory_archive` — produce a portable JSON archive with SHA-256 integrity metadata.
@@ -33,29 +36,42 @@ The repository also contains `AI_INSTALL.md` and `ai-install.json` so another ca
 
 ## Exact save trigger and interview
 
-Life Memory is deliberately **not** an automatic chat logger. An AI must not save ordinary conversation, inferred preferences, background details, or a whole transcript on its own.
+Life Memory is deliberately **not** an automatic chat logger. An AI must not save ordinary conversation, inferred preferences, background details, or an entire transcript on its own.
 
 A save workflow may begin only after the user says exactly:
 
 > **Сохрани воспоминания в архив**
 
-No synonym or paraphrase counts. After that phrase, the AI must start `start_memory_save_interview` and ask:
+No synonym, capitalization change, punctuation change, or paraphrase counts.
 
-1. What exactly should be saved?
-2. In what context should it be understood?
-3. Keep the exact words, a summary, or both?
-4. Should the entry be private or public?
-5. After showing the final formulation: does the user explicitly confirm it?
+After that phrase the AI must:
 
-Only after the final confirmation can `save_memory` succeed. The plugin enforces this with a short-lived interview session ID, so a host AI cannot directly call `save_memory` without first passing the exact trigger gate.
+1. call `start_memory_save_interview`;
+2. ask **what exactly** should be saved;
+3. ask the **context** needed to understand it correctly;
+4. ask whether to preserve the **exact words, a summary, or both**;
+5. ask whether the entry should be **private or public**;
+6. ask whether any details must be **excluded**;
+7. call `prepare_memory_save`;
+8. show the returned **exact preview** to the user;
+9. ask whether the user explicitly confirms saving that exact preview;
+10. only after confirmation call `save_memory` with the matching `preview_id`.
 
-This means the archive behaves more like a deliberate personal notebook than a hidden transcript recorder.
+The preview is hashed with SHA-256. `save_memory` writes the already-prepared preview, so a host AI cannot silently change the memory after the user approved it.
+
+Pending save sessions are single-use and expire. If the user changes their mind, the AI should call `cancel_memory_save`.
+
+This means the archive behaves like a deliberate personal notebook rather than a hidden transcript recorder.
 
 ## Privacy by design
 
-New profiles and new memories are private by default. Saving itself requires the exact trigger phrase, a mandatory interview, and explicit final confirmation. Publishing requires an explicit action. Persona simulation is a **separate consent flag** and defaults to false. The owner token is shown once and stored only as a SHA-256 hash.
+New profiles and new memories are private by default. Personal memory data stays in the local `.life-memory/` data directory unless the owner explicitly exports or publishes it. The **public GitHub repository contains plugin code, examples and documentation — not a user's private memory database**.
 
-Do not put passwords, financial secrets, private medical records, government identifiers, or other highly sensitive information into a public archive.
+Saving, publishing, and persona simulation are three separate permissions. Consent to one does not imply consent to the others.
+
+Do not put passwords, API keys, owner tokens, financial secrets, government identifiers, or other highly sensitive information into a public archive.
+
+See `docs/CONSENT_PROTOCOL.md` and `docs/PRIVACY_MODEL.md`.
 
 ## Local install (MCP stdio)
 
@@ -87,7 +103,7 @@ Example MCP config:
 }
 ```
 
-## HTTP mode for ChatGPT-compatible remote MCP hosts
+## HTTP mode for remote MCP hosts
 
 The project also supports Streamable HTTP:
 
