@@ -15,17 +15,20 @@ export async function createLifeMemoryServer(options = {}) {
   const server = new McpServer(
     {
       name: 'life-memory-mcp',
-      version: '0.2.0',
+      version: '0.3.0',
       websiteUrl: 'https://github.com/officiallionsurfnet-create/life-memory-mcp'
     },
     {
       capabilities: { tools: {} },
       instructions: [
         'Life Memory stores user-controlled memory archives.',
-        `ABSOLUTE SAVE RULE: never save anything unless the user explicitly says exactly: "${SAVE_TRIGGER_PHRASE}". Do not treat synonyms, paraphrases, inferred intent, or prior consent as permission to save.`,
-        'After the trigger phrase, do not save immediately. Start a memory-save interview and ask what exactly should be saved, the context, whether exact wording or a summary should be kept, and whether it should be private or public.',
-        'Show the final proposed memory to the user and obtain explicit confirmation before calling save_memory.',
-        'Do not silently archive whole chats. Only save the specific user-approved memory/reflection and its user-approved context.',
+        `ABSOLUTE SAVE RULE: never save anything unless the user explicitly says exactly: "${SAVE_TRIGGER_PHRASE}". Do not treat synonyms, paraphrases, inferred intent, prior consent, or ordinary conversation as permission to save.`,
+        'After the trigger phrase, do not save immediately. Start a memory-save interview.',
+        'Ask what exactly should be saved, the context, exact words vs summary vs both, privacy level, and whether anything must be excluded.',
+        'Then call prepare_memory_save and show the returned preview to the user.',
+        'Only after the user explicitly confirms that exact preview may save_memory be called with the matching preview_id.',
+        'Do not silently archive whole chats. Save only the specific user-approved content and context.',
+        'If the user changes their mind, call cancel_memory_save or let the session expire.',
         'Never publish a profile or memory without explicit user consent.',
         'Memory-based persona mode is a simulation, not the real person or their consciousness.',
         'When the user asks to talk with an archived person, call load_memory_persona and clearly preserve that distinction.'
@@ -84,8 +87,8 @@ export async function createLifeMemoryServer(options = {}) {
     } catch (e) { return errorResult(e); }
   });
 
-  server.registerTool('save_memory', {
-    description: `FINAL save step after start_memory_save_interview. Never call directly. Requires a valid interview session created only by the exact phrase "${SAVE_TRIGGER_PHRASE}", required context fields, and explicit final user confirmation.`,
+  server.registerTool('prepare_memory_save', {
+    description: 'Prepare the exact memory that the user is considering saving after the mandatory interview. Returns an immutable preview_id. This still does NOT save anything.',
     inputSchema: z.object({
       profile: z.string().min(1),
       owner_token: z.string().min(16),
@@ -99,11 +102,11 @@ export async function createLifeMemoryServer(options = {}) {
       visibility: z.enum(['private', 'public']).default('private'),
       source_type: z.enum(['user', 'conversation', 'document', 'audio-transcript', 'other']).default('user'),
       source_ref: z.string().max(1000).optional(),
-      user_confirmed: z.literal(true)
+      excluded_details: z.string().max(10000).optional()
     })
   }, async args => {
     try {
-      return textResult(await store.saveMemory({
+      return textResult(await store.prepareMemorySave({
         profileRef: args.profile,
         ownerToken: args.owner_token,
         interviewSessionId: args.interview_session_id,
@@ -116,6 +119,61 @@ export async function createLifeMemoryServer(options = {}) {
         visibility: args.visibility,
         sourceType: args.source_type,
         sourceRef: args.source_ref,
+        excludedDetails: args.excluded_details
+      }));
+    } catch (e) { return errorResult(e); }
+  });
+
+  server.registerTool('get_memory_save_status', {
+    description: 'Inspect an active memory-save interview/preview session without saving anything.',
+    inputSchema: z.object({
+      profile: z.string().min(1),
+      owner_token: z.string().min(16),
+      interview_session_id: z.string().uuid()
+    })
+  }, async args => {
+    try {
+      return textResult(await store.getMemorySaveStatus({
+        profileRef: args.profile,
+        ownerToken: args.owner_token,
+        interviewSessionId: args.interview_session_id
+      }));
+    } catch (e) { return errorResult(e); }
+  });
+
+  server.registerTool('cancel_memory_save', {
+    description: 'Cancel a pending memory-save interview/preview. Nothing is saved.',
+    inputSchema: z.object({
+      profile: z.string().min(1),
+      owner_token: z.string().min(16),
+      interview_session_id: z.string().uuid()
+    })
+  }, async args => {
+    try {
+      return textResult(await store.cancelMemorySave({
+        profileRef: args.profile,
+        ownerToken: args.owner_token,
+        interviewSessionId: args.interview_session_id
+      }));
+    } catch (e) { return errorResult(e); }
+  });
+
+  server.registerTool('save_memory', {
+    description: `FINAL save step. Never call directly. Requires a valid interview created only by the exact phrase "${SAVE_TRIGGER_PHRASE}", a prepared preview, the matching preview_id, and explicit user confirmation of that exact preview.`,
+    inputSchema: z.object({
+      profile: z.string().min(1),
+      owner_token: z.string().min(16),
+      interview_session_id: z.string().uuid(),
+      preview_id: z.string().length(64),
+      user_confirmed: z.literal(true)
+    })
+  }, async args => {
+    try {
+      return textResult(await store.saveMemory({
+        profileRef: args.profile,
+        ownerToken: args.owner_token,
+        interviewSessionId: args.interview_session_id,
+        previewId: args.preview_id,
         userConfirmed: args.user_confirmed
       }));
     } catch (e) { return errorResult(e); }
@@ -224,17 +282,19 @@ export async function createLifeMemoryServer(options = {}) {
     inputSchema: z.object({})
   }, async () => textResult({
     name: 'Life Memory MCP',
-    version: '0.2.0',
+    version: '0.3.0',
     repository: 'https://github.com/officiallionsurfnet-create/life-memory-mcp',
     stdio_install: 'npx -y github:officiallionsurfnet-create/life-memory-mcp',
     save_trigger_phrase: SAVE_TRIGGER_PHRASE,
     save_policy: [
       'Never save from ordinary conversation.',
       `Only start saving after the exact phrase: ${SAVE_TRIGGER_PHRASE}`,
-      'Always interview the user about exactly what to save and the context.',
-      'Show the final formulation and get explicit confirmation.',
-      'Then and only then call save_memory.'
+      'Always interview the user about exactly what to save, context, wording, privacy, and exclusions.',
+      'Call prepare_memory_save and show the exact preview.',
+      'Get explicit confirmation of that preview.',
+      'Then and only then call save_memory with the matching preview_id.'
     ],
+    privacy: 'Personal archives are local by default. The public GitHub repository contains plugin code, not a user’s private memories.',
     principle: 'User-owned memory. Explicit consent for saving, publishing, and persona simulation. A simulation is never the real person.'
   }));
 
