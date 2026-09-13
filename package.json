@@ -1,7 +1,7 @@
 {
   "name": "life-memory-mcp",
-  "version": "0.2.0",
-  "description": "Portable MCP memory archive: save, share, discover, import, and talk with memory-based personas with explicit consent.",
+  "version": "0.3.0",
+  "description": "Portable MCP memory archive with strict trigger, interview, preview, confirmation, sharing, discovery, import, and consented memory-based personas.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/officiallionsurfnet-create/life-memory-mcp",
@@ -33,6 +33,8 @@
     "ai-memory",
     "digital-legacy",
     "persona",
+    "consent",
+    "privacy",
     "chatgpt",
     "claude",
     "codex"
